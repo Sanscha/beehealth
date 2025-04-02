@@ -1,0 +1,186 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'medicine_screen.dart';
+
+class ResultScreen extends StatelessWidget {
+  final File imageFile;
+  final String analysisText;
+  final String detectedDisease;
+  final String medicines;
+
+  const ResultScreen({
+    required this.imageFile,
+    required this.analysisText,
+    required this.detectedDisease,
+    required this.medicines,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.yellow.shade700,
+        title: Text(
+          'Analysis Result',
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+      ),
+      body: Stack(
+        children: [
+          // Background image
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/statistical_background.jpeg'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+
+          // Semi-transparent overlay
+          Container(
+            color: Colors.black.withOpacity(0.3),
+          ),
+
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Scanned image with white background
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 6,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    padding: EdgeInsets.all(8),
+                    child: Image.file(imageFile, height: 200),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Analysis text in card
+                  Container(
+                    width: double.infinity,
+                    child: Card(
+                      color: Colors.white.withOpacity(0.8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Text(
+                          analysisText,
+                          style: GoogleFonts.poppins(fontSize: 16),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Disease detection in card
+                  Container(
+                    width: double.infinity,
+                    child: Card(
+                      color: Colors.white.withOpacity(0.8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Text(
+                          detectedDisease.isNotEmpty && detectedDisease != "No Disease Found"
+                              ? "🦟 Disease Identified: $detectedDisease"
+                              : "✅ No Disease Detected",
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: detectedDisease.isNotEmpty && detectedDisease != "No Disease Found"
+                                ? Colors.black
+                                : Colors.black,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Medicines in card (if available)
+                  if (medicines.isNotEmpty && medicines != "No medicines found")
+                    Container(
+                      width: double.infinity,
+                      child: Card(
+                        color: Colors.white.withOpacity(0.8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "💊 Suggested Medicines:",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                medicines,
+                                style: GoogleFonts.poppins(fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 30),
+
+                  // Show Medicine button
+                  // if (detectedDisease.isNotEmpty && detectedDisease != "No Disease Found")
+                  //   // ElevatedButton(
+                    //   onPressed: () {
+                    //     Navigator.push(
+                    //       context,
+                    //       MaterialPageRoute(
+                    //         builder: (context) => MedicineScreen(disease: detectedDisease),
+                    //       ),
+                    //     );
+                    //   },
+                    //   style: ElevatedButton.styleFrom(
+                    //     backgroundColor: Colors.yellow.shade700,
+                    //     shape: RoundedRectangleBorder(
+                    //       borderRadius: BorderRadius.circular(8),
+                    //     ),
+                    //     padding: const EdgeInsets.symmetric(
+                    //         vertical: 12, horizontal: 24),
+                    //     elevation: 5,
+                    //   ),
+                    //   child: const Text(
+                    //     "🔬 Show Medicine",
+                    //     style: TextStyle(
+                    //       color: Colors.black,
+                    //       fontWeight: FontWeight.w600,
+                    //     ),
+                    //   ),
+                    // ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

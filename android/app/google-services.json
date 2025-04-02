@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "410261861564",
+    "project_id": "beehealth-d12fa",
+    "storage_bucket": "beehealth-d12fa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:410261861564:android:22bfe03fc50ebf0ef08cb9",
+        "android_client_info": {
+          "package_name": "com.example.beehealth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcJsIKfp2wAG1LQhOXVVysk1fRp--ifEU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
