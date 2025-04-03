@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:BeeSentinel/sidebar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -13,35 +11,19 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  List<FlSpot> tempHumidityData = [];
-  Timer? timer;
-  final Random random = Random();
-
-  @override
-  void initState() {
-    super.initState();
-    _generateRandomData();
-    timer = Timer.periodic(Duration(seconds: 3), (timer) {
-      _generateRandomData();
-    });
-  }
-
-  void _generateRandomData() {
-    setState(() {
-      if (tempHumidityData.length >= 10) {
-        tempHumidityData.removeAt(0); // Keep list limited
-      }
-      double temp = 25 + random.nextDouble() * 10; // 25-35°C
-      double humidity = 40 + random.nextDouble() * 30; // 40-70%
-      tempHumidityData.add(FlSpot(temp, humidity));
-    });
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
-  }
+  // Constant data that won't change
+  final List<FlSpot> tempHumidityData = [
+    FlSpot(25, 45),
+    FlSpot(26, 50),
+    FlSpot(27, 55),
+    FlSpot(28, 52),
+    FlSpot(29, 58),
+    FlSpot(30, 60),
+    FlSpot(31, 62),
+    FlSpot(32, 65),
+    FlSpot(31, 63),
+    FlSpot(30, 58),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -75,12 +57,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: LineChart(
                 LineChartData(
+                  minX: 24,
+                  maxX: 33,
+                  minY: 40,
+                  maxY: 70,
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          return Text('${value.toInt()}%');
+                        },
+                      ),
                     ),
                     bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          return Text('${value.toInt()}°C');
+                        },
+                      ),
                     ),
                   ),
                   borderData: FlBorderData(show: true),

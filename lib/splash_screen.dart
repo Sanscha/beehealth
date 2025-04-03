@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              "Bee Sentinel Monitoring",
+              "Bee Health Monitoring",
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
