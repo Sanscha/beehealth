@@ -58,12 +58,12 @@ class _HealthtipsScreenState extends State<HealthtipsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.yellow.shade700,
         title: Text(
-          'Bee Sentil Tips',
+          'Bee Sentinell Tips',
           style: GoogleFonts.poppins(
               fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
         ),
       ),
-      drawer: CustomSidebar(),
+      // drawer: CustomSidebar(),
       body: Stack(
         children: [
           // Background image

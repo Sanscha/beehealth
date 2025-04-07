@@ -61,7 +61,7 @@ class _ResultsHistoryScreenState extends State<ResultsHistoryScreen> {
           ),
         ],
       ),
-      drawer: CustomSidebar(),
+      // drawer: CustomSidebar(),
       body: Stack(
         children: [
           // Background image

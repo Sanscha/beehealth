@@ -156,7 +156,7 @@ class ResultScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (context) => const HealthtipsScreen()),
-
+                               
                           );
                         },
                         style: ElevatedButton.styleFrom(

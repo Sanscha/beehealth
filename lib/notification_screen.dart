@@ -25,7 +25,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         color: Colors.black,
     ),
     ),),
-    drawer:CustomSidebar(),);
+    drawer:CustomSidebar(),
+    );
 
   }
 }

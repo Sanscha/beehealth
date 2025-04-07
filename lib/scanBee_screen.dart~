@@ -180,7 +180,7 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
 
     String title = 'Hive Weight Update';
     String body = isInitial
-        ? 'Initial hive weight ${initialWeight.toStringAsFixed(2)} gms'
+        ? 'Initial hive weight for $tag: ${initialWeight.toStringAsFixed(2)} gms'
         : 'Weight increased by ${weightGain.toStringAsFixed(2)} gms for $tag today!';
 
     await flutterLocalNotificationsPlugin.show(tag.hashCode, title, body, platformDetails);

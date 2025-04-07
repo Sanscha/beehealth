@@ -37,6 +37,7 @@ class AuthService {
         password: password.trim(),
       );
 
+
       final userId = userCredential.user!.uid;
       final userData = {
         "uid": userId,
@@ -117,6 +118,8 @@ class AuthService {
         email: email,
         password: password,
       );
+      SharedPreferences sharedPreferences= await SharedPreferences.getInstance();
+      sharedPreferences.setString('email', email.trim());
       return userCredential.user;
     } catch (e) {
       throw Exception("Login failed: $e");

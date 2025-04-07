@@ -49,6 +49,9 @@ dependencies:
   path: ^1.9.0
   fl_chart: ^0.70.2
   shared_preferences: ^2.5.3
+  bubble_bottom_bar: ^2.0.0
+  flutter_local_notifications: ^19.0.0
+  timezone: ^0.10.0
 #  uni_links3: ^0.5.3
 
 dev_dependencies:
