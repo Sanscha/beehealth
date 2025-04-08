@@ -1,4 +1,5 @@
 import 'package:BeeSentinel/scanBee_screen.dart';
+import 'package:BeeSentinel/sidebar.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -23,6 +24,7 @@ class HomeScreen extends StatelessWidget {
           ),
               ),
         ),),
+      drawer: CustomSidebar(),
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(

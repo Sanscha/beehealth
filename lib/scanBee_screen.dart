@@ -3,6 +3,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:BeeSentinel/result_screen.dart';
 import 'package:BeeSentinel/resulthistory_screen.dart';
+import 'package:BeeSentinel/notification_screen.dart';
+import 'package:BeeSentinel/sidebar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +13,8 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 class ScanBeeScreen extends StatefulWidget {
   const ScanBeeScreen({super.key});
@@ -24,120 +28,131 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
   bool _isLoading = false;
   final picker = ImagePicker();
   late GenerativeModel _model;
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+  FlutterLocalNotificationsPlugin();
+  final Random _random = Random();
 
   @override
   void initState() {
     super.initState();
-    _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
-      apiKey: 'AIzaSyCm0P159Sw13W6GbJ84m7sN08yCQWn4PEQ', // Replace with your API key
-    );
-    _simulateDailyWeightIncreaseForAllImages();
+    _initializeGemini();
+    _initializeNotifications();
+    _checkForPendingNotifications();
   }
 
-  Future<void> _simulateDailyWeightIncreaseForAllImages() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> history = prefs.getStringList('scanHistory') ?? [];
+  void _initializeGemini() {
+    _model = GenerativeModel(
+      model: 'gemini-1.5-flash',
+      apiKey: 'AIzaSyCm0P159Sw13W6GbJ84m7sN08yCQWn4PEQ',
+    );
+  }
 
-    for (String entry in history) {
-      Map<String, dynamic> data = jsonDecode(entry);
-      String path = data['imagePath'];
-      String key = path.replaceAll('/', '_');
+  Future<void> _initializeNotifications() async {
+    tz.initializeTimeZones();
+    const AndroidInitializationSettings initializationSettingsAndroid =
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+    final InitializationSettings initializationSettings =
+    InitializationSettings(android: initializationSettingsAndroid);
 
-      double lastWeight = prefs.getDouble('${key}_lastWeight') ?? 0.0;
-      int lastDay = prefs.getInt('${key}_lastDay') ?? 1;
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const NotificationScreen()),
+        );
+      },
+    );
+  }
 
-      if (lastDay < 4 && lastWeight < 36) {
-        double dailyIncrease = 1 + Random().nextDouble() * 3;
-        double newWeight = (lastWeight + dailyIncrease).clamp(0, 36);
-        await prefs.setDouble('${key}_lastWeight', newWeight);
-        await prefs.setInt('${key}_lastDay', lastDay + 1);
-        showHiveWeightNotification(newWeight - lastWeight, tag: key);
+  Future<void> _checkForPendingNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final activeScans = prefs.getKeys().where((key) => key.startsWith('scan_')).toList();
+
+    for (String scanKey in activeScans) {
+      final scanData = jsonDecode(prefs.getString(scanKey)!);
+      final lastUpdate = DateTime.parse(scanData['lastUpdate']);
+      final daysPassed = now.difference(lastUpdate).inDays;
+      final currentDay = scanData['currentDay'];
+
+      if (currentDay < 4 && daysPassed > 0) {
+        for (int i = 0; i < daysPassed && currentDay + i <= 4; i++) {
+          await _processWeightUpdate(scanKey, scanData);
+        }
       }
     }
   }
 
   Future<void> _pickImage() async {
-    final prefs = await SharedPreferences.getInstance();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      String path = pickedFile.path;
-      String key = path.replaceAll('/', '_');
-      if (prefs.containsKey('${key}_lastWeight')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Image already scanned. Wait for daily updates.")),
-        );
-        return;
-      }
-      setState(() => _imageFile = File(path));
-      _analyzeImage(_imageFile!);
+      setState(() => _imageFile = File(pickedFile.path));
+      await _analyzeImage(_imageFile!);
     }
   }
 
   Future<void> _analyzeImage(File imageFile) async {
     setState(() => _isLoading = true);
+
     try {
-      Uint8List imageBytes = await imageFile.readAsBytes();
-      final content = [
-        Content.data('image/jpeg', imageBytes),
-        Content.text(
-          "Analyze this honeybee image and provide:\n"
-              "- Health: [Healthy/Unhealthy]\n"
-              "- Disease: [None/Varroa Mites/Nosema/Deformed Wing Virus/American Foulbrood]\n"
-              "- Wings: [Intact/Partially Broken/Fully Broken/Missing]\n"
-              "- Legs: [All Present/Missing Front/Missing Middle/Missing Rear]\n"
-              "- Temp: [Optimal/High/Low]\n"
-              "- Humidity: [Optimal/High/Low]\n"
-              "- Species: [Apis Mellifera/Apis Cerana/Unknown]\n"
-              "Respond in single line with comma-separated values in the same order",
-        ),
-      ];
-
-      final response = await _model.generateContent(content);
-      String responseText = response.text ?? "No response";
-      List<String> parts = responseText.split(',').map((e) => e.trim()).toList();
-      while (parts.length < 7) parts.add("Unknown");
-
-      final random = Random();
-      String tempDisplay = _formatTemp(parts[4], random);
-      String humidityDisplay = _formatHumidity(parts[5], random);
-
-      String analysisText = "• Health: ${parts[0]}\n"
-          "• Disease: ${parts[1]}\n"
-          "• Wings: ${parts[2]}\n"
-          "• Legs: ${parts[3]}\n"
-          "• Temperature: $tempDisplay\n"
-          "• Humidity: $humidityDisplay\n"
-          "• Species: ${parts[6]}";
-
-      String path = imageFile.path;
-      String key = path.replaceAll('/', '_');
-
-      double initialWeight = 8 + random.nextDouble() * 2;
+      // ✅ Use a shorter hash-based ID
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final scanId = timestamp.hashCode.toString(); // Compact 32-bit-safe string ID
+      final imagePath = imageFile.path;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('${key}_lastWeight', initialWeight);
-      await prefs.setInt('${key}_lastDay', 1);
-      showHiveWeightNotification(0.0, isInitial: true, initialWeight: initialWeight, tag: key);
 
-      String detectedDisease = parts[1].contains("None") ? "No Disease Found" : parts[1];
-      String medicines = detectedDisease == "No Disease Found"
-          ? "No medicines needed"
-          : _simplifyMedicineResponse(await _fetchMedicines(detectedDisease));
+      if (prefs.containsKey('scan_$scanId')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("This image was already scanned")),
+        );
+        return;
+      }
 
-      await _saveResult(imageFile.path, analysisText, detectedDisease, medicines);
+      final analysisResults = await _processImageAnalysis(imageFile);
+
+      final initialWeight = 8 + _random.nextDouble() * 2;
+      final weightData = {
+        'scanId': scanId,
+        'imagePath': imagePath,
+        'currentWeight': initialWeight,
+        'currentDay': 1,
+        'lastUpdate': DateTime.now().toIso8601String(),
+        'weightHistory': jsonEncode([
+          {
+            'day': 1,
+            'weight': initialWeight,
+            'increase': 0.0,
+            'timestamp': DateTime.now().toIso8601String()
+          }
+        ])
+      };
+
+      await prefs.setString('scan_$scanId', jsonEncode(weightData));
+      await _saveToHistory(scanId, imagePath, analysisResults, initialWeight);
+
+      await _showWeightNotification(
+        scanId: scanId,
+        imagePath: imagePath,
+        weight: initialWeight,
+        increase: 0.0,
+        isInitial: true,
+      );
+
+      await _scheduleDailyWeightUpdates(scanId, imagePath, initialWeight);
 
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ResultScreen(
             imageFile: imageFile,
-            analysisText: analysisText,
-            detectedDisease: detectedDisease,
-            medicines: medicines,
+            analysisText: analysisResults['analysisText']!,
+            detectedDisease: analysisResults['detectedDisease']!,
+            medicines: analysisResults['medicines']!,
           ),
         ),
       );
     } catch (e) {
+      print(e.toString());
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: ${e.toString()}")),
       );
@@ -146,59 +161,204 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
     }
   }
 
-  String _formatTemp(String status, Random random) {
-    status = status.replaceAll('-', '').trim();
-    if (status == "Unknown" || status == "Optimal") return "${(33 + random.nextDouble() * 3).toStringAsFixed(1)}°C (Optimal)";
-    return status == "High"
-        ? "${(36 + random.nextDouble() * 2).toStringAsFixed(1)}°C (High)"
-        : "${(30 + random.nextDouble() * 3).toStringAsFixed(1)}°C (Low)";
+  Future<Map<String, String>> _processImageAnalysis(File imageFile) async {
+    Uint8List imageBytes = await imageFile.readAsBytes();
+    final content = [
+      Content.data('image/jpeg', imageBytes),
+      Content.text(
+          "Analyze this honeybee image and provide:\n"
+              "- Health: [Healthy/Unhealthy]\n"
+              "- Disease: [None/Varroa Mites/Nosema/Deformed Wing Virus/American Foulbrood]\n"
+              "- Wings: [Intact/Partially Broken/Fully Broken/Missing]\n"
+              "- Legs: [All Present/Missing Front/Missing Middle/Missing Rear]\n"
+              "- Temp: [Optimal/High/Low]\n"
+              "- Humidity: [Optimal/High/Low]\n"
+              "- Species: [Apis Mellifera/Apis Cerana/Unknown]\n"
+              "Respond in single line with comma-separated values in the same order"
+      ),
+    ];
+
+    final response = await _model.generateContent(content);
+    String responseText = response.text ?? "No response";
+    List<String> parts = responseText.split(',').map((e) => e.trim()).toList();
+    while (parts.length < 7) parts.add("Unknown");
+
+    String tempDisplay = _formatTemp(parts[4]);
+    String humidityDisplay = _formatHumidity(parts[5]);
+
+    String analysisText = "• Health: ${parts[0]}\n"
+        "• Disease: ${parts[1]}\n"
+        "• Wings: ${parts[2]}\n"
+        "• Legs: ${parts[3]}\n"
+        "• Temperature: $tempDisplay\n"
+        "• Humidity: $humidityDisplay\n"
+        "• Species: ${parts[6]}";
+
+    String detectedDisease = parts[1].contains("None") ? "No Disease Found" : parts[1];
+    String medicines = detectedDisease == "No Disease Found"
+        ? "No medicines needed"
+        : await _fetchMedicines(detectedDisease);
+
+    return {
+      'analysisText': analysisText,
+      'detectedDisease': detectedDisease,
+      'medicines': medicines,
+    };
   }
 
-  String _formatHumidity(String status, Random random) {
-    status = status.replaceAll('-', '').trim();
-    if (status == "Unknown" || status == "Optimal") return "${(50 + random.nextDouble() * 10).toStringAsFixed(1)}% (Optimal)";
-    return status == "High"
-        ? "${(70 + random.nextDouble() * 10).toStringAsFixed(1)}% (High)"
-        : "${(30 + random.nextDouble() * 20).toStringAsFixed(1)}% (Low)";
+  Future<void> _scheduleDailyWeightUpdates(String scanId, String imagePath, double initialWeight) async {
+    double currentWeight = initialWeight;
+
+    for (int day = 2; day <= 4; day++) {
+      final scheduledTime = tz.TZDateTime.now(tz.local).add(Duration(days: day - 1));
+
+      int notificationId = (int.tryParse(scanId) ?? 1000) + day;
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        int.parse(scanId) + day,
+        'Day $day Weight Update',
+        'Your hive weight update is ready',
+        scheduledTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'weight_updates',
+            'Weight Updates',
+            channelDescription: 'Daily hive weight progress',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time, // Optional if repeating daily
+        payload: jsonEncode({
+          'scanId': scanId,
+          'imagePath': imagePath,
+          'day': day,
+        }),
+      );
+
+
+    }
   }
 
-  void showHiveWeightNotification(double weightGain,
-      {bool isInitial = false, double initialWeight = 0.0, required String tag}) async {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+  Future<void> _processWeightUpdate(String scanKey, Map<String, dynamic> scanData) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentWeight = scanData['currentWeight'];
+    final currentDay = scanData['currentDay'];
 
+    if (currentDay >= 4 || currentWeight >= 36) return;
+
+    num remainingWeight = 36 - currentWeight;
+    double dailyIncrease = (remainingWeight / (4 - currentDay)) * (0.8 + _random.nextDouble() * 0.4);
+    double newWeight = (currentWeight + dailyIncrease).clamp(0, 36);
+
+    var weightHistory = List<Map<String, dynamic>>.from(jsonDecode(scanData['weightHistory']));
+    weightHistory.add({
+      'day': currentDay + 1,
+      'weight': newWeight,
+      'increase': dailyIncrease,
+      'timestamp': DateTime.now().toIso8601String()
+    });
+
+    scanData['currentWeight'] = newWeight;
+    scanData['currentDay'] = currentDay + 1;
+    scanData['lastUpdate'] = DateTime.now().toIso8601String();
+    scanData['weightHistory'] = jsonEncode(weightHistory);
+
+    await prefs.setString(scanKey, jsonEncode(scanData));
+
+    await _showWeightNotification(
+      scanId: scanData['scanId'],
+      imagePath: scanData['imagePath'],
+      weight: newWeight,
+      increase: dailyIncrease,
+    );
+  }
+
+  Future<void> _showWeightNotification({
+    required String scanId,
+    required String imagePath,
+    required double weight,
+    required double increase,
+    bool isInitial = false,
+  }) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'weight_channel',
-      'Hive Weight',
-      channelDescription: 'Daily hive weight update',
-      importance: Importance.max,
+      'weight_updates',
+      'Weight Updates',
+      channelDescription: 'Daily hive weight progress',
+      importance: Importance.high,
       priority: Priority.high,
       playSound: true,
     );
 
     const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
 
-    String title = 'Hive Weight Update';
+    String title = isInitial ? 'Initial Weight Recorded' : 'Day ${(increase == 0 ? 1 : (weight~/10)+1)} Weight Update';
     String body = isInitial
-        ? 'Initial hive weight ${initialWeight.toStringAsFixed(2)} gms'
-        : 'Weight increased by ${weightGain.toStringAsFixed(2)} gms for $tag today!';
+        ? 'Initial weight: ${weight.toStringAsFixed(2)}g'
+        : 'Increased by ${increase.toStringAsFixed(2)}g (Total: ${weight.toStringAsFixed(2)}g)';
 
-    await flutterLocalNotificationsPlugin.show(tag.hashCode, title, body, platformDetails);
+    await flutterLocalNotificationsPlugin.show(
+      int.parse(scanId),
+      title,
+      body,
+      platformDetails,
+      payload: jsonEncode({
+        'scanId': scanId,
+        'imagePath': imagePath,
+        'weight': weight,
+        'increase': increase,
+        'isInitial': isInitial,
+      }),
+    );
   }
 
-  String _simplifyMedicineResponse(String medicines) {
-    final lines = medicines.split('\n').where((line) => line.trim().isNotEmpty).toList();
-    return lines.take(3).join('\n');
+  Future<void> _saveToHistory(
+      String scanId,
+      String imagePath,
+      Map<String, String> analysisResults,
+      double initialWeight,
+      ) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList('scanHistory') ?? [];
+
+    Map<String, dynamic> newEntry = {
+      "scanId": scanId,
+      "imagePath": imagePath,
+      "analysisText": analysisResults['analysisText'],
+      "detectedDisease": analysisResults['detectedDisease'],
+      "medicines": analysisResults['medicines'],
+      "timestamp": DateTime.now().toIso8601String(),
+    };
+
+    history.add(jsonEncode(newEntry));
+    await prefs.setStringList('scanHistory', history);
+  }
+
+  String _formatTemp(String status) {
+    status = status.replaceAll('-', '').trim();
+    if (status == "Unknown" || status == "Optimal") return "${(33 + _random.nextDouble() * 3).toStringAsFixed(1)}°C (Optimal)";
+    return status == "High"
+        ? "${(36 + _random.nextDouble() * 2).toStringAsFixed(1)}°C (High)"
+        : "${(30 + _random.nextDouble() * 3).toStringAsFixed(1)}°C (Low)";
+  }
+
+  String _formatHumidity(String status) {
+    status = status.replaceAll('-', '').trim();
+    if (status == "Unknown" || status == "Optimal") return "${(50 + _random.nextDouble() * 20).toStringAsFixed(1)}% (Optimal)";
+    return status == "High"
+        ? "${(70 + _random.nextDouble() * 10).toStringAsFixed(1)}% (High)"
+        : "${(30 + _random.nextDouble() * 20).toStringAsFixed(1)}% (Low)";
   }
 
   Future<String> _fetchMedicines(String disease) async {
     try {
       final response = await _model.generateContent([
         Content.text(
-          "List exactly 3 medicines for $disease in honeybees in this format:\n"
-              "1. MedicineName - BriefUsage\n"
-              "2. MedicineName - BriefUsage\n"
-              "3. MedicineName - BriefUsage",
+            "List exactly 3 medicines for $disease in honeybees in this exact format:\n"
+                "1. MedicineName - BriefUsage\n"
+                "2. MedicineName - BriefUsage\n"
+                "3. MedicineName - BriefUsage"
         ),
       ]);
 
@@ -207,27 +367,10 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
           .where((line) => line.trim().isNotEmpty)
           .take(3)
           .map((line) => line.replaceFirst(RegExp(r'^\d+\.\s*'), '• '))
-          .join('\n') ??
-          "No medicines found";
+          .join('\n') ?? "No medicines found";
     } catch (e) {
       return "Error fetching medicines";
     }
-  }
-
-  Future<void> _saveResult(String imagePath, String analysisText, String disease, String medicines) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> history = prefs.getStringList('scanHistory') ?? [];
-
-    Map<String, String> newEntry = {
-      "imagePath": imagePath,
-      "analysisText": analysisText,
-      "detectedDisease": disease,
-      "medicines": medicines,
-      "timestamp": DateTime.now().toIso8601String(),
-    };
-
-    history.add(jsonEncode(newEntry));
-    await prefs.setStringList('scanHistory', history);
   }
 
   void _openHistoryScreen() {
@@ -242,14 +385,10 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.yellow.shade700,
-        title: Center(
-          child: Text(
-            'Scan Bee Health',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
+        title: Text(
+          'Scan Bee Health',
+          style: GoogleFonts.poppins(
+            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black,
           ),
         ),
         actions: [
@@ -259,6 +398,7 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
           ),
         ],
       ),
+      drawer: CustomSidebar(),
       body: Stack(
         children: [
           Container(
@@ -273,6 +413,7 @@ class _ScanBeeScreenState extends State<ScanBeeScreen> {
           Center(
             child: SingleChildScrollView(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Card(
                     margin: EdgeInsets.all(20),

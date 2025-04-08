@@ -63,8 +63,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-      drawer: CustomSidebar(),
-
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
