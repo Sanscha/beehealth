@@ -1,7 +1,6 @@
 import 'package:BeeSentinel/forgot_password_screen.dart';
 import 'package:BeeSentinel/scanBee_screen.dart';
 import 'package:BeeSentinel/signup_screen.dart';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -21,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true; // Added for password visibility toggle
 
   void login() async {
     final email = emailController.text.trim();
@@ -41,8 +41,6 @@ class _LoginScreenState extends State<LoginScreen> {
         // Store login status in SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
-
-        // Optionally store user email too
         await prefs.setString('userEmail', email);
 
         Navigator.pushReplacement(
@@ -58,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Bee animation - positioned higher
           Positioned(
-            top: 60,  // Reduced from 100 to move animation up
+            top: 60,
             left: 0,
             right: 0,
             child: Center(
@@ -94,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Centered login form - positioned lower
           Positioned(
-            top: 280,  // Added top position to move form down
+            top: 280,
             left: 0,
             right: 0,
             child: SingleChildScrollView(
@@ -139,16 +138,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Password Field
+                    // Password Field with visibility toggle
                     TextField(
                       controller: passwordController,
-                      obscureText: true,
+                      obscureText: _obscurePassword,
                       decoration: InputDecoration(
                         labelText: "Password",
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                         prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(height: 25),

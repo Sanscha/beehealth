@@ -12,12 +12,38 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final authService = AuthService();
-
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _isPasswordValid = false;
+  String _passwordErrorText = '';
+
+  // Password validation rules
+  final RegExp _passwordRegex = RegExp(
+    r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', // At least 8 chars with letters and numbers
+  );
+
+  void _validatePassword(String value) {
+    setState(() {
+      if (value.isEmpty) {
+        _isPasswordValid = false;
+        _passwordErrorText = '';
+      } else if (value.length < 8) {
+        _isPasswordValid = false;
+        _passwordErrorText = 'Password must be at least 8 characters';
+      } else if (!_passwordRegex.hasMatch(value)) {
+        _isPasswordValid = false;
+        _passwordErrorText = 'Password must contain letters and numbers';
+      } else {
+        _isPasswordValid = true;
+        _passwordErrorText = '';
+      }
+    });
+  }
 
   void signUp() async {
     final email = emailController.text.trim();
@@ -26,9 +52,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final firstName = firstNameController.text.trim();
     final lastName = lastNameController.text.trim();
 
-    if (email.isEmpty || password.isEmpty || username.isEmpty || firstName.isEmpty || lastName.isEmpty) {
+    if (email.isEmpty || username.isEmpty || firstName.isEmpty || lastName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    if (!_isPasswordValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid password')),
       );
       return;
     }
@@ -38,7 +71,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Account Created Successfully!')),
       );
-      Navigator.pop(context); // Go back to Login screen
+      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
@@ -164,20 +197,72 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Password Field
+                        // Password Field with visibility toggle and validation
                         TextField(
                           controller: passwordController,
-                          obscureText: true,
+                          obscureText: _obscurePassword,
+                          onChanged: _validatePassword,
                           decoration: InputDecoration(
                             labelText: "Password",
+                            errorText: _passwordErrorText.isNotEmpty ? _passwordErrorText : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
                             filled: true,
                             fillColor: Colors.white.withOpacity(0.9),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),
+
+                        // Password requirements
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Password must:",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "• Be at least 8 characters",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: _passwordErrorText.contains('8 characters')
+                                      ? Colors.red
+                                      : Colors.grey[700],
+                                ),
+                              ),
+                              Text(
+                                "• Contain both letters and numbers",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: _passwordErrorText.contains('letters and numbers')
+                                      ? Colors.red
+                                      : Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
 
                         // Sign Up Button
                         SizedBox(

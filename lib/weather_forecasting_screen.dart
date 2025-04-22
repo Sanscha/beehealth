@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class WeatherForecastingScreen extends StatefulWidget {
   const WeatherForecastingScreen({super.key});
@@ -138,6 +139,20 @@ class _WeatherForecastingScreenState extends State<WeatherForecastingScreen> {
     }
   }
 
+  List<FlSpot> getTempSpots() {
+    return List.generate(
+      forecastData.length,
+          (i) => FlSpot(i.toDouble(), (forecastData[i]['main']['temp'] as num).toDouble()),
+    );
+  }
+
+  List<FlSpot> getHumiditySpots() {
+    return List.generate(
+      forecastData.length,
+          (i) => FlSpot(i.toDouble(), (forecastData[i]['main']['humidity'] as num).toDouble()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,39 +168,76 @@ class _WeatherForecastingScreenState extends State<WeatherForecastingScreen> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-        itemCount: forecastData.length,
-
-    itemBuilder: (context, index) {
-    final item = forecastData[index];
-    final date = formatDate(item['dt_txt']);
-    final temp = (item['main']['temp'] as num).toDouble(); // ✅ cast safely
-    final humidity = (item['main']['humidity'] as num).toDouble();
-    final condition = item['weather'][0]['main'];
-
-    final seasonalInsight = getSeasonalInsight(temp);
-    final schedulingTip = getSchedulingTip(condition);
-
-    return Card(
-            margin: const EdgeInsets.all(8),
-            elevation: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("📅 Date: $date", style: _textStyle()),
-                  Text("🌤️ Condition: $condition", style: _textStyle()),
-                  Text("🌡️ Temperature: ${temp.toStringAsFixed(1)}°C", style: _textStyle()),
-                  Text("💧 Humidity: $humidity%", style: _textStyle()),
-                  const SizedBox(height: 6),
-                  Text("🧠 Insight: $seasonalInsight", style: _textStyle(fontWeight: FontWeight.w600)),
-                  Text("📌 Tip: $schedulingTip", style: _textStyle(fontWeight: FontWeight.w600)),
-                ],
+          : SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            Text("📊 Temperature & Humidity Trends", style: _textStyle(fontWeight: FontWeight.bold)),
+            SizedBox(
+              height: 300,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: LineChart(
+                  LineChartData(
+                    titlesData: FlTitlesData(show: false),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: getTempSpots(),
+                        isCurved: true,
+                        color: Colors.orange,
+                        barWidth: 3,
+                        dotData: FlDotData(show: false),
+                      ),
+                      LineChartBarData(
+                        spots: getHumiditySpots(),
+                        isCurved: true,
+                        color: Colors.blue,
+                        barWidth: 3,
+                        dotData: FlDotData(show: false),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          );
-        },
+            const Divider(),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: forecastData.length,
+              itemBuilder: (context, index) {
+                final item = forecastData[index];
+                final date = formatDate(item['dt_txt']);
+                final temp = (item['main']['temp'] as num).toDouble();
+                final humidity = (item['main']['humidity'] as num).toDouble();
+                final condition = item['weather'][0]['main'];
+                final seasonalInsight = getSeasonalInsight(temp);
+                final schedulingTip = getSchedulingTip(condition);
+
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  elevation: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("📅 Date: $date", style: _textStyle()),
+                        Text("🌤️ Condition: $condition", style: _textStyle()),
+                        Text("🌡️ Temperature: ${temp.toStringAsFixed(1)}°C", style: _textStyle()),
+                        Text("💧 Humidity: $humidity%", style: _textStyle()),
+                        const SizedBox(height: 6),
+                        Text("🧠 Insight: $seasonalInsight", style: _textStyle(fontWeight: FontWeight.w600)),
+                        Text("📌 Tip: $schedulingTip", style: _textStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
